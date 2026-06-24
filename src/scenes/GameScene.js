@@ -26,6 +26,9 @@ export default class GameScene extends Phaser.Scene {
     const cfg = this.getLevelConfig(this.level);
 
     this.W = W; this.H = H; this.RADIUS = RADIUS;
+    const SEQ_PANEL_H = 58;
+    this.safeMinY = 145;
+    this.safeMaxY = (this.gameMode === 'sequence') ? (H - SEQ_PANEL_H - RADIUS - 10) : (H - RADIUS - 10);
     this.BASE_SPEED   = cfg.speed;
     this.SPHERE_COUNT = cfg.sphereCount;
     this.deflector    = null;
@@ -48,6 +51,8 @@ export default class GameScene extends Phaser.Scene {
     this.matter.add.rectangle(W / 2, H + WALL / 2,  W, WALL, wallOpts);
     this.matter.add.rectangle(-WALL / 2,   H / 2, WALL, H,   wallOpts);
     this.matter.add.rectangle(W + WALL / 2, H / 2, WALL, H,   wallOpts);
+    // Pared invisible pegada al borde inferior del panel UI (panel termina en y=78)
+    this.matter.add.rectangle(W / 2, 78 + WALL / 2, W, WALL, wallOpts);
 
     // Esferas iniciales
     const numbers = [];
@@ -59,7 +64,7 @@ export default class GameScene extends Phaser.Scene {
 
     // ── Panel UI superior ──────────────────────────────────────────────────
     const uiPanel = this.add.graphics().setDepth(19);
-    uiPanel.fillStyle(0x08061a, 0.88);
+    uiPanel.fillStyle(0x08061a, 1);
     uiPanel.fillRect(0, 0, W, 78);
     uiPanel.lineStyle(1, 0x3344aa, 0.4);
     uiPanel.lineBetween(0, 78, W, 78);
@@ -71,7 +76,7 @@ export default class GameScene extends Phaser.Scene {
       .on('pointerdown', () => this.showPauseMenu());
 
     // Etiqueta de modo
-    const modeLabels = { classic: `Nivel ${this.level}`, sequence: `SECUENCIA · Nv.${this.level}`, evade: `CAOS · Nv.${this.level}` };
+    const modeLabels = { classic: `Nivel ${this.level}`, sequence: `SECUENCIA · Nv.${this.level}`, evade: `MATCH · Nv.${this.level}` };
     const modeColors = { classic: '#7788ff', sequence: '#f39c12', evade: '#e74c3c' };
     this.add.text(50, 12, modeLabels[this.gameMode], {
       fontFamily: 'Arial', fontSize: '16px', fontStyle: 'bold',
@@ -100,11 +105,7 @@ export default class GameScene extends Phaser.Scene {
           const sp = this.spheres.find(s => s.body === sb);
           if (sp) {
             sp.recentlyDeflected = true;
-            if (this.gameMode === 'evade') {
-              // puntos por deflectar activamente en modo evita
-              this.currentScore += 10;
-              this.evadeScoreTxt?.setText(`${this.currentScore} pts`);
-            }
+            this.deflectorImpactEffect(sp);
           }
           continue;
         }
@@ -151,9 +152,11 @@ export default class GameScene extends Phaser.Scene {
     barBg.fillRoundedRect(BAR_X, BAR_Y, BAR_W, BAR_H, 5);
     this.progressBar = this.add.graphics().setDepth(21);
     this.barConfig = { x: BAR_X, y: BAR_Y, w: BAR_W, h: BAR_H };
-    this.add.text(W / 2, BAR_Y + BAR_H + 4, `Meta: ${this.targetScore} pts`, {
-      fontFamily: 'Arial', fontSize: '11px', color: '#556688'
-    }).setOrigin(0.5, 0).setDepth(20);
+    if (this.gameMode === 'classic') {
+      this.add.text(W / 2, BAR_Y + BAR_H + 4, `Meta: ${this.targetScore} pts`, {
+        fontFamily: 'Arial', fontSize: '11px', color: '#556688'
+      }).setOrigin(0.5, 0).setDepth(20);
+    }
     this.updateProgressBar();
   }
 
@@ -168,9 +171,18 @@ export default class GameScene extends Phaser.Scene {
       fontFamily: 'Arial', fontSize: '20px', fontStyle: 'bold', color: '#ffffff'
     }).setOrigin(1, 0).setDepth(20);
 
-    this.add.text(W / 2, 52, 'Toca dos iguales para unirlas', {
-      fontFamily: 'Arial', fontSize: '12px', color: '#7788aa'
-    }).setOrigin(0.5, 0).setDepth(20);
+    // Barra de caos — muestra cuánto falta para el próximo swap
+    const BAR_X = 12, BAR_Y = 52, BAR_W = W - 24, BAR_H = 8;
+    const barBg = this.add.graphics().setDepth(20);
+    barBg.fillStyle(0x1a1040, 1);
+    barBg.fillRoundedRect(BAR_X, BAR_Y, BAR_W, BAR_H, 4);
+    this.chaosBar     = this.add.graphics().setDepth(21);
+    this.chaosBarCfg  = { x: BAR_X, y: BAR_Y, w: BAR_W, h: BAR_H };
+    this.chaosBarPct  = 0;
+
+    this.add.text(BAR_X, BAR_Y - 1, 'MATCH', {
+      fontFamily: 'Arial', fontSize: '9px', color: '#e74c3c'
+    }).setOrigin(0, 1).setDepth(21);
   }
 
   // ── Modo Secuencia ────────────────────────────────────────────────────────
@@ -183,8 +195,13 @@ export default class GameScene extends Phaser.Scene {
     // Panel inferior para la secuencia
     const W = this.W, H = this.H;
     const panelH = 58;
+
+    // Pared física justo encima del panel inferior
+    const wallOpts = { isStatic: true, friction: 0, restitution: 1.0, label: 'wall' };
+    this.matter.add.rectangle(W / 2, H - panelH - 10, W, 20, wallOpts);
+
     const bg = this.add.graphics().setDepth(19);
-    bg.fillStyle(0x08061a, 0.88);
+    bg.fillStyle(0x08061a, 1);
     bg.fillRect(0, H - panelH, W, panelH);
     bg.lineStyle(1, 0x3344aa, 0.4);
     bg.lineBetween(0, H - panelH, W, H - panelH);
@@ -248,7 +265,7 @@ export default class GameScene extends Phaser.Scene {
       color: '#ffffff', stroke: '#000000', strokeThickness: 6, alpha: 0
     }).setOrigin(0.5).setDepth(80);
 
-    const counts = ['3', '2', '1', '¡CAOS!'];
+    const counts = ['3', '2', '1', '¡MATCH!'];
     const colors = ['#ffffff', '#f39c12', '#e74c3c', '#ff44ff'];
 
     counts.forEach((label, i) => {
@@ -272,10 +289,39 @@ export default class GameScene extends Phaser.Scene {
   }
 
   startChaosTick() {
-    this.chaosTicker = this.time.addEvent({
-      delay: 7000, loop: true,
-      callback: this.chaosTick, callbackScope: this
+    this.chaosTickMs    = 7000;
+    this.chaosTickStart = this.time.now;
+
+    // Aviso 1.5s antes del swap
+    this.chaosWarningEvent = this.time.addEvent({
+      delay: this.chaosTickMs - 1500, loop: true,
+      callback: this.showChaosWarning, callbackScope: this
     });
+
+    this.chaosTicker = this.time.addEvent({
+      delay: this.chaosTickMs, loop: true,
+      callback: () => { this.chaosTick(); this.chaosTickStart = this.time.now; },
+      callbackScope: this
+    });
+  }
+
+  showChaosWarning() {
+    if (this.victoryTriggered) return;
+    const alive = this.spheres.filter(s => s.body);
+    if (alive.length < 4) return;
+    // Pulso naranja en TODAS las esferas — aviso genérico de swap inminente
+    for (const s of alive) {
+      const fx = this.add.graphics().setDepth(12).setPosition(s.body.position.x, s.body.position.y);
+      fx.lineStyle(4, 0xff8800, 0.9);
+      fx.strokeCircle(0, 0, this.RADIUS + 6);
+      this.tweens.add({ targets: fx, alpha: 0, scaleX: 1.5, scaleY: 1.5, duration: 600, ease: 'Power2', onComplete: () => fx.destroy() });
+    }
+    // Texto de aviso
+    const warn = this.add.text(this.W / 2, this.H / 2, '⚡ SWAP', {
+      fontFamily: 'Arial', fontSize: '28px', fontStyle: 'bold',
+      color: '#ff8800', stroke: '#000000', strokeThickness: 4
+    }).setOrigin(0.5).setDepth(30).setAlpha(0);
+    this.tweens.add({ targets: warn, alpha: 1, duration: 200, yoyo: true, hold: 400, onComplete: () => warn.destroy() });
   }
 
   chaosTick() {
@@ -301,7 +347,7 @@ export default class GameScene extends Phaser.Scene {
       fx.fillStyle(0xffffff, 0.55);
       fx.fillCircle(0, 0, this.RADIUS);
       this.tweens.add({ targets: fx, alpha: 0, duration: 350, onComplete: () => fx.destroy() });
-      this.tweens.add({ targets: s.txt, scaleX: 1.7, scaleY: 1.7, duration: 120, yoyo: true, ease: 'Power2' });
+      this.tweens.add({ targets: s.txt, scaleX: 1.7, scaleY: 1.7, duration: 120, yoyo: true, ease: 'Power2', onComplete: () => { if (s.txt?.active) s.txt.setScale(1, 1); } });
     }
 
     // Si la selección actual fue afectada, deseleccionar
@@ -373,6 +419,19 @@ export default class GameScene extends Phaser.Scene {
     this.showFloatingScore(cx, cy, points, this.evadeCombo > 2 ? '#f1c40f' : '#2ecc71', label);
     this.evadeCombo > 1 ? this.sound.matchPerfecto() : this.sound.matchSimple();
     this.perfectMatchEffect(sA, sB, cx, cy);
+
+    // Combo visual grande en pantalla
+    if (this.evadeCombo >= 2) {
+      const comboColors = ['', '', '#2ecc71', '#f39c12', '#e74c3c', '#ff44ff'];
+      const col = comboColors[Math.min(this.evadeCombo, 5)];
+      const comboTxt = this.add.text(this.W / 2, this.H / 2 - 60, `¡x${this.evadeCombo} COMBO!`, {
+        fontFamily: 'Arial', fontSize: '42px', fontStyle: 'bold',
+        color: col, stroke: '#000000', strokeThickness: 5
+      }).setOrigin(0.5).setDepth(50).setScale(0.5);
+      this.tweens.add({ targets: comboTxt, scaleX: 1, scaleY: 1, duration: 200, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: comboTxt, alpha: 0, y: this.H / 2 - 120, duration: 700, delay: 500, ease: 'Power2', onComplete: () => comboTxt.destroy() });
+    }
+
     this.time.delayedCall(1800, () => this.spawnEdgePair(sA.number));
   }
 
@@ -414,6 +473,7 @@ export default class GameScene extends Phaser.Scene {
     this.victoryTriggered = true;
     this.evadeTimer?.remove();
     this.chaosTicker?.remove();
+    this.chaosWarningEvent?.remove();
     this.sphereSpawnEvent?.remove();
     this.selectionGfx?.destroy();
     this.matter.world.pause();
@@ -433,6 +493,7 @@ export default class GameScene extends Phaser.Scene {
     this.victoryTriggered = true;
     this.evadeTimer?.remove();
     this.chaosTicker?.remove();
+    this.chaosWarningEvent?.remove();
     this.sphereSpawnEvent?.remove();
     this.selectionGfx?.destroy();
     this.matter.world.pause();
@@ -615,7 +676,7 @@ export default class GameScene extends Phaser.Scene {
     if (x === undefined) {
       const m = RADIUS + 10;
       x = Phaser.Math.Between(m, W - m);
-      y = Phaser.Math.Between(m, H - m);
+      y = Phaser.Math.Between(this.safeMinY, this.safeMaxY);
     }
     const color = this.COLORS[Phaser.Math.Between(0, this.COLORS.length - 1)];
     const body  = this.matter.add.circle(x, y, RADIUS, { restitution: 1.0, friction: 0, frictionAir: 0, label: 'sphere' });
@@ -641,10 +702,10 @@ export default class GameScene extends Phaser.Scene {
       const edge = Phaser.Math.Between(0, 3);
       let x, y;
       switch (edge) {
-        case 0: x = Phaser.Math.Between(RADIUS+5, W-RADIUS-5); y = RADIUS+5;       break;
-        case 1: x = Phaser.Math.Between(RADIUS+5, W-RADIUS-5); y = H-RADIUS-5;    break;
-        case 2: x = RADIUS+5;     y = Phaser.Math.Between(RADIUS+5, H-RADIUS-5);  break;
-        case 3: x = W-RADIUS-5;   y = Phaser.Math.Between(RADIUS+5, H-RADIUS-5);  break;
+        case 0: x = Phaser.Math.Between(RADIUS+5, W-RADIUS-5); y = this.safeMinY;                                      break;
+        case 1: x = Phaser.Math.Between(RADIUS+5, W-RADIUS-5); y = this.safeMaxY;                                     break;
+        case 2: x = RADIUS+5;   y = Phaser.Math.Between(this.safeMinY, this.safeMaxY); break;
+        case 3: x = W-RADIUS-5; y = Phaser.Math.Between(this.safeMinY, this.safeMaxY); break;
       }
       const sphere = this.spawnSphere(number, x, y);
       sphere.gfx.setScale(0).setAlpha(0);
@@ -734,9 +795,10 @@ export default class GameScene extends Phaser.Scene {
     this.paused = true;
     this.matter.world.pause();
     if (this.deflector) this.destroyDeflector();
-    if (this.evadeTimer)       this.evadeTimer.paused       = true;
-    if (this.chaosTicker)      this.chaosTicker.paused      = true;
-    if (this.sphereSpawnEvent) this.sphereSpawnEvent.paused = true;
+    if (this.evadeTimer)        this.evadeTimer.paused        = true;
+    if (this.chaosTicker)       this.chaosTicker.paused       = true;
+    if (this.chaosWarningEvent) this.chaosWarningEvent.paused = true;
+    if (this.sphereSpawnEvent)  this.sphereSpawnEvent.paused  = true;
 
     const W = this.W, H = this.H;
     const overlay = this.add.rectangle(W/2, H/2, W, H, 0x000000, 0.65).setDepth(40).setInteractive();
@@ -748,7 +810,7 @@ export default class GameScene extends Phaser.Scene {
     const cleanup = () => {
       this.children.list.filter(c => c.depth >= 40 && c.depth <= 44).forEach(c => c.destroy());
     };
-    this.makeOverlayBtn(W/2, H/2,    'Continuar', 0x2ecc71, () => { cleanup(); this.paused=false; this.matter.world.resume(); if(this.evadeTimer) this.evadeTimer.paused=false; if(this.chaosTicker) this.chaosTicker.paused=false; if(this.sphereSpawnEvent) this.sphereSpawnEvent.paused=false; }, 41);
+    this.makeOverlayBtn(W/2, H/2,    'Continuar', 0x2ecc71, () => { cleanup(); this.paused=false; this.matter.world.resume(); if(this.evadeTimer) this.evadeTimer.paused=false; if(this.chaosTicker) this.chaosTicker.paused=false; if(this.chaosWarningEvent) this.chaosWarningEvent.paused=false; if(this.sphereSpawnEvent) this.sphereSpawnEvent.paused=false; }, 41);
     this.makeOverlayBtn(W/2, H/2+65, 'Menú',      0x3498db, () => { cleanup(); this.paused=false; this.cameras.main.fadeOut(300,0,0,0); this.cameras.main.once('camerafadeoutcomplete',()=>this.scene.start('MenuScene')); }, 41);
   }
 
@@ -773,8 +835,8 @@ export default class GameScene extends Phaser.Scene {
       for (const s of this.spheres) s.recentlyDeflected = false;
     });
 
-    const R = 20;
-    const body = this.matter.add.circle(x, y, R, { isStatic:true, restitution:1.2, friction:0, label:'deflector' });
+    const R = 28;
+    const body = this.matter.add.circle(x, y, R, { isStatic:true, restitution:1.6, friction:0, label:'deflector' });
     const gfx  = this.add.graphics().setDepth(10).setPosition(x, y);
     this.drawDeflector(gfx, R);
     const ring = this.add.graphics().setDepth(9);
@@ -793,6 +855,64 @@ export default class GameScene extends Phaser.Scene {
       this.tweens.add({ targets:[gfx,ring], alpha:0, duration:300, onComplete: () => { pulseTween.stop(); this.destroyDeflector(); } });
     });
     this.deflector = { body, gfx, ring, pulseTween, timer };
+  }
+
+  deflectorImpactEffect(sphere) {
+    if (!this.deflector?.body || !sphere.body) return;
+
+    const dx = sphere.body.position.x - this.deflector.body.position.x;
+    const dy = sphere.body.position.y - this.deflector.body.position.y;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+
+    // Velocidad de salida fuerte — sensación de borde sólido
+    const SPEED = 4.8;
+    this.matter.body.setVelocity(sphere.body, {
+      x: (dx / len) * SPEED,
+      y: (dy / len) * SPEED
+    });
+
+    const ix = sphere.body.position.x - (dx / len) * this.RADIUS;
+    const iy = sphere.body.position.y - (dy / len) * this.RADIUS;
+
+    // Screen shake
+    this.cameras.main.shake(100, 0.005);
+
+    // Squish en la esfera — onComplete garantiza retorno a escala 1
+    this.tweens.add({
+      targets: [sphere.gfx, sphere.txt],
+      scaleX: 0.78, scaleY: 1.3,
+      duration: 55, yoyo: true, ease: 'Power2',
+      onComplete: () => {
+        if (sphere.gfx?.active) sphere.gfx.setScale(1, 1);
+        if (sphere.txt?.active) sphere.txt.setScale(1, 1);
+      }
+    });
+
+    // Burst de partículas
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const p = this.add.graphics().setDepth(16).setPosition(ix, iy);
+      p.fillStyle(sphere.color, 1);
+      p.fillCircle(0, 0, 5);
+      const dist = Phaser.Math.Between(25, 55);
+      this.tweens.add({
+        targets: p,
+        x: ix + Math.cos(angle) * dist,
+        y: iy + Math.sin(angle) * dist,
+        alpha: 0, scaleX: 0.2, scaleY: 0.2,
+        duration: 300, ease: 'Power2',
+        onComplete: () => p.destroy()
+      });
+    }
+
+    // Pulso en el deflector
+    if (this.deflector?.gfx?.active) {
+      this.tweens.add({
+        targets: this.deflector.gfx,
+        scaleX: 1.5, scaleY: 1.5,
+        duration: 70, yoyo: true, ease: 'Power2'
+      });
+    }
   }
 
   destroyDeflector() {
@@ -823,8 +943,16 @@ export default class GameScene extends Phaser.Scene {
 
   drawDeflector(gfx, radius) {
     gfx.clear();
-    gfx.fillStyle(0xffffff, 0.35); gfx.fillCircle(0, 0, radius);
-    gfx.lineStyle(2, 0xffffff, 0.9); gfx.strokeCircle(0, 0, radius);
+    // Glow exterior
+    gfx.fillStyle(0x88aaff, 0.08); gfx.fillCircle(0, 0, radius + 22);
+    gfx.fillStyle(0x88aaff, 0.15); gfx.fillCircle(0, 0, radius + 12);
+    // Núcleo
+    gfx.fillStyle(0xffffff, 0.55); gfx.fillCircle(0, 0, radius);
+    gfx.lineStyle(3, 0xaaccff, 1);  gfx.strokeCircle(0, 0, radius);
+    // Cruz de energía
+    gfx.lineStyle(1.5, 0xffffff, 0.5);
+    gfx.lineBetween(-radius * 0.6, 0, radius * 0.6, 0);
+    gfx.lineBetween(0, -radius * 0.6, 0, radius * 0.6);
   }
 
   // ── Update ────────────────────────────────────────────────────────────────
@@ -860,6 +988,19 @@ export default class GameScene extends Phaser.Scene {
       } else if (speed > MAX) {
         const f = MAX/speed; this.matter.body.setVelocity(sphere.body, { x:vx*f, y:vy*f });
       }
+    }
+
+    // Barra de caos
+    if (this.chaosBar && this.chaosTickStart !== undefined) {
+      const elapsed = this.time.now - this.chaosTickStart;
+      const pct     = Math.min(elapsed / this.chaosTickMs, 1);
+      const { x, y, w, h } = this.chaosBarCfg;
+      this.chaosBar.clear();
+      // Color: verde → amarillo → rojo según cercanía al swap
+      const r = Math.round(pct < 0.5 ? pct * 2 * 255 : 255);
+      const g = Math.round(pct < 0.5 ? 200 : (1 - (pct - 0.5) * 2) * 200);
+      this.chaosBar.fillStyle((r << 16) | (g << 8) | 0, 1);
+      this.chaosBar.fillRoundedRect(x, y, w * pct, h, 4);
     }
 
     // Anillo de selección en modo Caos
