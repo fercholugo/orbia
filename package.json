@@ -1,0 +1,20 @@
+{
+  "name": "orbia",
+  "version": "1.0.0",
+  "description": "Juego móvil de física con esferas numéricas",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "serve": "serve dist -l 3000"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "phaser": "^3.87.0",
+    "serve": "^14.2.6"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

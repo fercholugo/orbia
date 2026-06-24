@@ -1,0 +1,15 @@
+{
+  "appId": "com.orbia.game",
+  "appName": "Orbia",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#0f0c22"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#0f0c22"
+    }
+  }
+}
