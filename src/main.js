@@ -8,6 +8,19 @@ new Phaser.Game({
   width: 390,
   height: 844,
   backgroundColor: '#0f0c22',
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 390,
+    height: 844,
+    zoom: Math.min(window.devicePixelRatio || 1, 3),
+  },
+  render: {
+    antialias: true,
+    antialiasGL: true,
+    pixelArt: false,
+    roundPixels: false,
+  },
   physics: {
     default: 'matter',
     matter: {

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Orbia Feature Graphic Generator</title>
+  <style>
+    body { margin: 0; background: #111; display: flex; flex-direction: column; align-items: center; padding: 20px; font-family: Arial; color: white; }
+    canvas { border: 1px solid #333; }
+    button { margin-top: 16px; padding: 12px 32px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="1024" height="500"></canvas>
+  <button onclick="download()">Descargar PNG</button>
+  <script>
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+
+    // Background gradient
+    const bg = ctx.createLinearGradient(0, 0, 1024, 500);
+    bg.addColorStop(0, '#0f0f23');
+    bg.addColorStop(1, '#1a1a3e');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 1024, 500);
+
+    // Decorative spheres
+    const spheres = [
+      { x: 80,  y: 80,  r: 55, color: '#e74c3c', n: '3' },
+      { x: 900, y: 120, r: 65, color: '#2ecc71', n: '7' },
+      { x: 180, y: 380, r: 50, color: '#9b59b6', n: '5' },
+      { x: 820, y: 370, r: 60, color: '#f39c12', n: '2' },
+      { x: 500, y: 60,  r: 40, color: '#3498db', n: '4' },
+      { x: 950, y: 420, r: 35, color: '#1abc9c', n: '1' },
+      { x: 60,  y: 430, r: 38, color: '#e67e22', n: '6' },
+    ];
+
+    spheres.forEach(s => {
+      // Glow
+      const glow = ctx.createRadialGradient(s.x, s.y, s.r * 0.1, s.x, s.y, s.r * 1.6);
+      glow.addColorStop(0, s.color + '44');
+      glow.addColorStop(1, 'transparent');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sphere
+      const grad = ctx.createRadialGradient(s.x - s.r * 0.3, s.y - s.r * 0.3, s.r * 0.1, s.x, s.y, s.r);
+      grad.addColorStop(0, '#ffffff55');
+      grad.addColorStop(0.4, s.color);
+      grad.addColorStop(1, s.color + 'aa');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Number
+      ctx.fillStyle = 'white';
+      ctx.font = `bold ${s.r * 0.9}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 4;
+      ctx.fillText(s.n, s.x, s.y);
+      ctx.shadowBlur = 0;
+    });
+
+    // Title ORBIA
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 120px Arial';
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillText('ORBIA', 512, 250);
+
+    ctx.font = 'bold 96px Arial';
+    const titleGrad = ctx.createLinearGradient(300, 200, 700, 300);
+    titleGrad.addColorStop(0, '#ffffff');
+    titleGrad.addColorStop(0.5, '#a78bfa');
+    titleGrad.addColorStop(1, '#60a5fa');
+    ctx.fillStyle = titleGrad;
+    ctx.shadowColor = '#6366f1';
+    ctx.shadowBlur = 30;
+    ctx.fillText('ORBIA', 512, 240);
+    ctx.shadowBlur = 0;
+
+    // Subtitle
+    ctx.font = '28px Arial';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText('Juego de esferas numéricas con física', 512, 330);
+
+    // Stars / particles
+    for (let i = 0; i < 60; i++) {
+      const x = Math.random() * 1024;
+      const y = Math.random() * 500;
+      const r = Math.random() * 2;
+      ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.4 + 0.1})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function download() {
+      const a = document.createElement('a');
+      a.download = 'orbia-feature-graphic.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }
+  </script>
+</body>
+</html>

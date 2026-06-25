@@ -114,6 +114,19 @@ export default class GameScene extends Phaser.Scene {
         if ((bodyA.label === 'wall' && bodyB.label === 'sphere') ||
             (bodyB.label === 'wall' && bodyA.label === 'sphere')) {
           this.sound.rebotePared();
+          const sph = bodyA.label === 'sphere' ? bodyA : bodyB;
+          const wal = bodyA.label === 'wall'   ? bodyA : bodyB;
+          const vx = sph.velocity.x, vy = sph.velocity.y;
+          const wallIsHoriz = (wal.bounds.max.x - wal.bounds.min.x) > (wal.bounds.max.y - wal.bounds.min.y);
+          if (wallIsHoriz) {
+            // pared horizontal (arriba/abajo) — reflejar vy
+            const newVy = sph.position.y < wal.position.y ? -Math.abs(vy || this.BASE_SPEED) : Math.abs(vy || this.BASE_SPEED);
+            this.matter.body.setVelocity(sph, { x: vx, y: newVy });
+          } else {
+            // pared vertical (izquierda/derecha) — reflejar vx
+            const newVx = sph.position.x < wal.position.x ? -Math.abs(vx || this.BASE_SPEED) : Math.abs(vx || this.BASE_SPEED);
+            this.matter.body.setVelocity(sph, { x: newVx, y: vy });
+          }
           continue;
         }
 
@@ -206,9 +219,9 @@ export default class GameScene extends Phaser.Scene {
     bg.lineStyle(1, 0x3344aa, 0.4);
     bg.lineBetween(0, H - panelH, W, H - panelH);
 
-    this.add.text(W / 2, H - panelH + 6, 'Orden:', {
-      fontFamily: 'Arial', fontSize: '12px', color: '#556688'
-    }).setOrigin(0.5, 0).setDepth(20);
+    this.add.text(10, H - panelH + 6, 'Orden:', {
+      fontFamily: 'Arial', fontSize: '11px', color: '#7788aa'
+    }).setOrigin(0, 0).setDepth(23);
 
     this.seqItems = [];
     const spacing = 52;
@@ -406,7 +419,7 @@ export default class GameScene extends Phaser.Scene {
     const cy = (sA.body.position.y + sB.body.position.y) / 2;
 
     const now = this.time.now;
-    this.evadeCombo = (now - this.lastMatchTime < 6000) ? Math.min(this.evadeCombo + 1, 5) : 1;
+    this.evadeCombo = (now - this.lastMatchTime < 6000) ? this.evadeCombo + 1 : 1;
     this.lastMatchTime = now;
 
     const points = 100 * this.evadeCombo;
@@ -422,8 +435,8 @@ export default class GameScene extends Phaser.Scene {
 
     // Combo visual grande en pantalla
     if (this.evadeCombo >= 2) {
-      const comboColors = ['', '', '#2ecc71', '#f39c12', '#e74c3c', '#ff44ff'];
-      const col = comboColors[Math.min(this.evadeCombo, 5)];
+      const comboColors = ['#2ecc71', '#f39c12', '#e74c3c', '#ff44ff', '#ffffff', '#00ffff'];
+      const col = comboColors[(this.evadeCombo - 2) % comboColors.length];
       const comboTxt = this.add.text(this.W / 2, this.H / 2 - 60, `¡x${this.evadeCombo} COMBO!`, {
         fontFamily: 'Arial', fontSize: '42px', fontStyle: 'bold',
         color: col, stroke: '#000000', strokeThickness: 5
@@ -679,7 +692,7 @@ export default class GameScene extends Phaser.Scene {
       y = Phaser.Math.Between(this.safeMinY, this.safeMaxY);
     }
     const color = this.COLORS[Phaser.Math.Between(0, this.COLORS.length - 1)];
-    const body  = this.matter.add.circle(x, y, RADIUS, { restitution: 1.0, friction: 0, frictionAir: 0, label: 'sphere' });
+    const body  = this.matter.add.circle(x, y, RADIUS, { restitution: 1.0, friction: 0, frictionAir: 0, frictionStatic: 0, label: 'sphere' });
     const a = Math.random() * Math.PI * 2;
     this.matter.body.setVelocity(body, { x: Math.cos(a) * this.BASE_SPEED, y: Math.sin(a) * this.BASE_SPEED });
 
@@ -864,12 +877,16 @@ export default class GameScene extends Phaser.Scene {
     const dy = sphere.body.position.y - this.deflector.body.position.y;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
 
-    // Velocidad de salida fuerte — sensación de borde sólido
     const SPEED = 4.8;
-    this.matter.body.setVelocity(sphere.body, {
-      x: (dx / len) * SPEED,
-      y: (dy / len) * SPEED
-    });
+    const vx = sphere.body.velocity.x;
+    const vy = sphere.body.velocity.y;
+    const speed = Math.sqrt(vx * vx + vy * vy);
+
+    if (speed > 0.1) {
+      this.matter.body.setVelocity(sphere.body, { x: (vx / speed) * SPEED, y: (vy / speed) * SPEED });
+    } else {
+      this.matter.body.setVelocity(sphere.body, { x: (dx / len) * SPEED, y: (dy / len) * SPEED });
+    }
 
     const ix = sphere.body.position.x - (dx / len) * this.RADIUS;
     const iy = sphere.body.position.y - (dy / len) * this.RADIUS;
@@ -930,15 +947,10 @@ export default class GameScene extends Phaser.Scene {
 
   drawSphere(gfx, x, y, radius, fillColor) {
     gfx.clear();
-    gfx.fillStyle(fillColor, 0.12); gfx.fillCircle(x, y, radius+10);
-    gfx.fillStyle(fillColor, 0.07); gfx.fillCircle(x, y, radius+18);
-    gfx.fillStyle(0x000000, 0.45);  gfx.fillCircle(x+5, y+6, radius-1);
     gfx.fillStyle(fillColor, 1);    gfx.fillCircle(x, y, radius);
-    gfx.lineStyle(radius*0.55, 0x000000, 0.28); gfx.strokeCircle(x, y, radius-radius*0.28);
-    gfx.lineStyle(2.5, 0xffffff, 0.55); gfx.strokeCircle(x, y, radius);
-    gfx.fillStyle(0xffffff, 0.17); gfx.fillCircle(x-radius*0.16, y-radius*0.2,  radius*0.56);
+    gfx.lineStyle(2.5, 0xffffff, 0.6); gfx.strokeCircle(x, y, radius);
+    gfx.fillStyle(0xffffff, 0.18); gfx.fillCircle(x-radius*0.16, y-radius*0.2,  radius*0.56);
     gfx.fillStyle(0xffffff, 0.92); gfx.fillCircle(x-radius*0.31, y-radius*0.37, radius*0.11);
-    gfx.lineStyle(3, 0xaa88ff, 0.18); gfx.strokeCircle(x+radius*0.08, y+radius*0.08, radius*0.84);
   }
 
   drawDeflector(gfx, radius) {

@@ -1,5 +1,5 @@
 {
-  "appId": "com.orbia.game",
+  "appId": "io.orbia.game",
   "appName": "Orbia",
   "webDir": "dist",
   "android": {
